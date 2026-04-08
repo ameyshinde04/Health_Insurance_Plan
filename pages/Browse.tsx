@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 
 const Browse: React.FC = () => {
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [allPlans, setAllPlans] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
@@ -37,11 +39,29 @@ const Browse: React.FC = () => {
     fetchPlans();
   }, []);
 
+  useEffect(() => {
+    const saved = localStorage.getItem("favorites");
+    if (saved) {
+      setFavorites(JSON.parse(saved));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (planId: string) => {
+    setFavorites((prev) =>
+      prev.includes(planId)
+        ? prev.filter((id) => id !== planId)
+        : [...prev, planId],
+    );
+  };
+
   async function fetchPlans() {
     const { data, error } = await supabase
       .from("health_insurance_plan")
       .select("*");
-      
 
     console.log("SUPABASE DATA:", data?.length, data?.[0]);
 
@@ -138,6 +158,11 @@ const Browse: React.FC = () => {
 
   const filteredPlans = useMemo(() => {
     return allPlans.filter((plan: any) => {
+      // ⭐ FAVORITES FILTER
+      if (showFavoritesOnly && !favorites.includes(plan.PlanId)) {
+        return false;
+      }
+
       const searchLower = search.toLowerCase();
 
       const matchesSearch =
@@ -173,7 +198,16 @@ const Browse: React.FC = () => {
         matchesType
       );
     });
-  }, [allPlans, search, metalFilter, statusFilter, stateFilter, typeFilter]);
+  }, [
+    allPlans,
+    search,
+    metalFilter,
+    statusFilter,
+    stateFilter,
+    typeFilter,
+    showFavoritesOnly,
+    favorites,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPlans.length / PAGE_SIZE));
 
@@ -277,6 +311,16 @@ const Browse: React.FC = () => {
             className={`p-2 rounded-lg transition-all ${viewType === "list" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-600"}`}
           >
             <List className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setShowFavoritesOnly((prev) => !prev)}
+            className={`ml-2 p-2 rounded-lg transition ${
+              showFavoritesOnly
+                ? "bg-red-100 text-red-500"
+                : "bg-slate-100 text-slate-400 hover:text-red-400"
+            }`}
+          >
+            ❤️
           </button>
         </div>
       </div>
@@ -609,12 +653,21 @@ const Browse: React.FC = () => {
                         {plan.PlanId}
                       </p>
                     </div>
-                    {plan.IsNewPlan === "New" && (
-                      <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter border border-emerald-100 flex items-center gap-0.5">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        NEW
-                      </span>
-                    )}
+
+                    {/* ⭐ FAVORITE BUTTON */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(plan.PlanId);
+                      }}
+                      className={`p-2 rounded-lg transition ${
+                        favorites.includes(plan.PlanId)
+                          ? "bg-red-100 text-red-500"
+                          : "bg-slate-100 text-slate-400 hover:text-red-500"
+                      }`}
+                    >
+                      ❤️
+                    </button>
                   </div>
                   <div className="space-y-3 mb-4">
                     <div className="flex justify-between items-center">
@@ -724,13 +777,29 @@ const Browse: React.FC = () => {
                       <td className="px-6 py-7 text-right font-black text-blue-600">
                         {plan.TEHBDedInnTier1Individual}
                       </td>
-                      <td className="px-8 py-7 text-right">
-                        <Link
-                          to={`/plan/${plan.PlanId}`}
-                          className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all inline-block shadow-sm"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </Link>
+                      <td className="px-8 py-7">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* ❤️ Favorite */}
+                          {favorites.includes(plan.PlanId) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(plan.PlanId);
+                              }}
+                              className="p-1.5 transition transform hover:scale-110 active:scale-95"
+                            >
+                              {favorites.includes(plan.PlanId) ? "❤️" : "🤍"}
+                            </button>
+                          )}
+
+                          {/* ➡ Arrow */}
+                          <Link
+                            to={`/plan/${plan.PlanId}`}
+                            className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
