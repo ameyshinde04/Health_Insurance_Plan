@@ -1,27 +1,45 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { SAMPLE_DATA } from '../data';
-import { 
-  Send, Bot, User, RefreshCcw, Copy, Check, 
-  ExternalLink, ShieldCheck, Sparkles, ArrowRight
-} from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+
+import {
+  Send,
+  Bot,
+  User,
+  RefreshCcw,
+  Copy,
+  Check,
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 import { GoogleGenAI } from "@google/genai";
 
 interface Message {
   id: string;
-  role: 'user' | 'bot';
+  role: "user" | "bot";
   text: string;
   isError?: boolean;
 }
 
-const STORAGE_KEY = 'insureplan_chat_history';
-const INITIAL_MESSAGE: Message = { 
-  id: '1', 
-  role: 'bot', 
-  text: "Hello! I'm your **InsurePlan AI Advisor**. I'm here to help you navigate the 2026 insurance registry with ease.\n\nWhether you're looking for the most affordable plan in your state or need to understand how a plan handles a specific situation like 'having a baby', I've got the data ready for you.\n\nHow can I help you find the right coverage today?" 
+const STORAGE_KEY = "insureplan_chat_history";
+const INITIAL_MESSAGE: Message = {
+  id: "1",
+  role: "bot",
+  text: `Hi 👋 I'm your **InsurePlan AI Advisor**.
+
+Instead of browsing hundreds of plans, I’ll help you quickly find the best one based on cost, coverage, and your needs.
+
+Tell me:
+• Your state  
+• Whether you prefer low monthly cost or low medical risk  
+• Any specific requirements  
+
+Or choose a quick option below 👇`,
 };
 
-const AIChatbot: React.FC = () => {
+const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
   // Load initial messages from sessionStorage
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
@@ -31,18 +49,28 @@ const AIChatbot: React.FC = () => {
       return [INITIAL_MESSAGE];
     }
   });
-  
-  const [input, setInput] = useState('');
+
+  const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const suggestions = [
-    "What's the best plan for me?",
-    "Show me cheap plans in Texas",
-    "How much does having a baby cost?",
-    "Find Bronze plans with low MOOP"
-  ];
+  const suggestions = selectedPlan
+    ? [
+        `Is this plan good for diabetes treatment?`,
+        `What will I pay for a fracture in this plan?`,
+        `Is deductible ₹${selectedPlan.TEHBDedInnTier1Individual} high?`,
+        `Compare this plan with better options`,
+        `Is this plan good for families?`,
+      ]
+    : [
+        "Help me find the best plan for my needs",
+        "Show me plans with low deductible",
+        "Find plans with lowest out-of-pocket cost",
+        "Show plans suitable for families",
+        "Find plans good for diabetes",
+      ];
 
   // Persist messages to sessionStorage whenever they change
   useEffect(() => {
@@ -50,10 +78,27 @@ const AIChatbot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
+    const fetchPlans = async () => {
+      const { data, error } = await supabase
+        .from("health_insurance_plan")
+        .select("*")
+        .limit(200); // IMPORTANT: don't load all 22k
+
+      if (!error && data) {
+        setPlans(data);
+      } else {
+        console.error("Error fetching plans:", error);
+      }
+    };
+
+    fetchPlans();
+  }, []);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   }, [messages, isTyping]);
@@ -65,24 +110,35 @@ const AIChatbot: React.FC = () => {
   };
 
   const handleReset = () => {
-    const resetMsg: Message = { 
-      id: Date.now().toString(), 
-      role: 'bot', 
-      text: "Advisor session reset. How can I help you explore the 2026 plans?" 
-    };
-    setMessages([resetMsg]);
-    sessionStorage.removeItem(STORAGE_KEY);
-  };
+  sessionStorage.removeItem(STORAGE_KEY);
+
+  setMessages([
+    {
+      id: Date.now().toString(),
+      role: "bot" as const,
+      text: "Session restarted ✅ Let's find the best plan for you.",
+    },
+    INITIAL_MESSAGE,
+  ]);
+};
+
+  if (plans.length === 0) {
+    return <div className="p-6">Loading plans...</div>;
+  }
 
   const handleSend = async (textOverride?: string) => {
     const textToUse = textOverride || input;
     if (!textToUse.trim() || isTyping) return;
 
     const userMsgId = Date.now().toString();
-    const userMessage: Message = { id: userMsgId, role: 'user', text: textToUse };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    const userMessage: Message = {
+      id: userMsgId,
+      role: "user",
+      text: textToUse,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
     setIsTyping(true);
 
     const botMsgId = (Date.now() + 1).toString();
@@ -90,63 +146,86 @@ const AIChatbot: React.FC = () => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
+
       const systemInstruction = `
-        You are the InsurePlan AI Advisor. Your goal is to help users find the best 2026 insurance plans using human-friendly language.
-        Dataset: ${JSON.stringify(SAMPLE_DATA)}.
-        
-        STRICT RULES:
-        1. CLARIFICATION: If the user asks a vague question (e.g., "best plan", "cheap plan"), you MUST ask:
-           - Which state?
-           - Which metal level (Bronze, Silver, Gold, High, Low, Catastrophic)?
-           - Preferred plan type (HMO, PPO, EPO, POS, Others)?
-        
-        2. DATA MATCHING: Translate intent into filters like stateCode, metalLevel, planType, deductible, MOOP.
-        
-        3. RESULT FORMAT: When showing plans, display:
-           - Plan Name
-           - Plan ID (StandardComponentId)
-           - State
-           - Metal Level
-           - Plan Type
-           - Individual Deductible
-           - Individual MOOP
-           - Reasoning: One short sentence explaining why it's recommended.
-        
-        4. CLICKABLE LINKS: For every plan mentioned, include a link using this format exactly: [[PLAN_LINK:PlanID]] (where PlanID is the StandardComponentId).
-        
-        5. LIMITS: Show a top 3 list only. Sort by user intent (e.g., lowest deductible).
-        
-        6. MEDICAL SCENARIOS: For "having a baby", "diabetes", or "fracture", explicitly show the scenario-specific Deductible, Copayment, and Coinsurance from the dataset (e.g., SBCHavingBabyDeductible).
-        
-        7. TONE: Friendly, simple, supportive. Avoid overly technical jargon.
-        
-        8. FOLLOW-UPS: End every response with 2 suggested follow-up questions starting with "Follow-up questions:".
-        
-        9. DATA ONLY: Never invent plans. Use provided dataset only.
-      `;
+You are an AI Insurance Advisor helping users find the best health insurance plan.
+
+Current Plan: ${JSON.stringify(selectedPlan)}
+Dataset: ${JSON.stringify(plans.slice(0, 100))}
+
+GOAL:
+Help users choose the best plan based on:
+- Deductible (TEHBDedInnTier1Individual)
+- Out-of-pocket max (TEHBInnTier1IndividualMOOP)
+- Metal level (Bronze, Silver, Gold)
+- Plan type (HMO, PPO, EPO)
+- Medical scenarios (diabetes, fracture, having a baby)
+
+RULES:
+
+1. FIRST QUESTION FLOW:
+If user asks "best plan", ask:
+- Which state? (StateCode)
+- Budget preference? (low deductible vs low premium)
+- Any medical needs? (diabetes, pregnancy, etc.)
+
+2. PLAN SELECTION LOGIC:
+- Low deductible → better for frequent care
+- Low MOOP → safer for emergencies
+- Bronze → cheaper but high cost later
+- Silver → balanced
+- Gold → expensive but low costs
+
+3. RESPONSE FORMAT:
+For each plan:
+- Plan Name
+- Plan ID (StandardComponentId)
+- State
+- Metal Level
+- Deductible
+- MOOP
+- Reason (1 line)
+
+4. SCENARIO QUESTIONS:
+Use:
+- SBCHavingDiabetes...
+- SBCHavingaBaby...
+- SBCHavingSimplefracture...
+
+5. FOLLOW-UP:
+Always ask 2 helpful follow-up questions.
+
+6. DO NOT GUESS DATA.
+`;
 
       const responseStream = await ai.models.generateContentStream({
-        model: 'gemini-3-flash-preview',
+        model: "gemini-3-flash-preview",
         contents: textToUse,
         config: { systemInstruction, temperature: 0.1 },
       });
 
-      setMessages(prev => [...prev, { id: botMsgId, role: 'bot', text: "" }]);
+      setMessages((prev) => [...prev, { id: botMsgId, role: "bot", text: "" }]);
 
       for await (const chunk of responseStream) {
         const chunkText = chunk.text;
         if (chunkText) {
           accumulatedText += chunkText;
-          setMessages(prev => prev.map(m => 
-            m.id === botMsgId ? { ...m, text: accumulatedText } : m
-          ));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botMsgId ? { ...m, text: accumulatedText } : m,
+            ),
+          );
         }
       }
     } catch (error) {
-      setMessages(prev => [
-        ...prev, 
-        { id: Date.now().toString(), role: 'bot', text: "I'm having trouble connecting to my registry right now. Please try again in a moment.", isError: true }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "bot",
+          text: "I'm having trouble connecting to my registry right now. Please try again in a moment.",
+          isError: true,
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -159,40 +238,55 @@ const AIChatbot: React.FC = () => {
       const match = part.match(/\[\[PLAN_LINK:([^\]]+)\]\]/);
       if (match) {
         const planId = match[1];
-        const plan = SAMPLE_DATA.find(p => p.PlanId === planId || p.StandardComponentId === planId);
+        const plan = plans.find(
+          (p) => p.PlanId === planId || p.StandardComponentId === planId,
+        );
         if (!plan) return null;
-        
+
         return (
-          <Link 
+          <Link
             key={index}
             to={`/plan/${plan.PlanId}`}
             className="block my-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-400 hover:bg-white hover:shadow-md transition-all group animate-in zoom-in-95 duration-300"
           >
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-1.5">
-                {plan.IsNewPlan === 'New' && (
+                {plan.IsNewPlan === "New" && (
                   <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[9px] font-black uppercase tracking-tighter flex items-center gap-0.5 shadow-sm">
                     <Sparkles className="w-2.5 h-2.5" />
                     NEW
                   </span>
                 )}
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
-                  plan.MetalLevel === 'Gold' ? 'bg-amber-100 text-amber-700' : 
-                  plan.MetalLevel === 'Silver' ? 'bg-slate-200 text-slate-700' :
-                  plan.MetalLevel === 'High' ? 'bg-purple-100 text-purple-700' :
-                  plan.MetalLevel === 'Low' ? 'bg-slate-100 text-slate-500' :
-                  plan.MetalLevel === 'Catastrophic' ? 'bg-red-100 text-red-700' :
-                  'bg-orange-100 text-orange-700'
-                }`}>
+                <span
+                  className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
+                    plan.MetalLevel === "Gold"
+                      ? "bg-amber-100 text-amber-700"
+                      : plan.MetalLevel === "Silver"
+                        ? "bg-slate-200 text-slate-700"
+                        : plan.MetalLevel === "High"
+                          ? "bg-purple-100 text-purple-700"
+                          : plan.MetalLevel === "Low"
+                            ? "bg-slate-100 text-slate-500"
+                            : plan.MetalLevel === "Catastrophic"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-orange-100 text-orange-700"
+                  }`}
+                >
                   {plan.MetalLevel}
                 </span>
               </div>
               <ExternalLink className="w-3 text-slate-300 group-hover:text-blue-500" />
             </div>
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 truncate">{plan.PlanVariantMarketingName}</h4>
+            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 truncate">
+              {plan.PlanVariantMarketingName}
+            </h4>
             <div className="mt-2 flex items-center justify-between text-[11px] font-bold">
-              <span className="text-slate-400 uppercase tracking-widest">{plan.StateCode} REGISTRY</span>
-              <span className="text-blue-600">{plan.TEHBDedInnTier1Individual} Ded.</span>
+              <span className="text-slate-400 uppercase tracking-widest">
+                {plan.StateCode} REGISTRY
+              </span>
+              <span className="text-blue-600">
+                {plan.TEHBDedInnTier1Individual} Ded.
+              </span>
             </div>
             <div className="mt-3 flex items-center text-blue-600 text-[11px] font-black uppercase tracking-widest gap-1 group-hover:gap-2 transition-all">
               <span>View Full Technical Specs</span>
@@ -201,13 +295,17 @@ const AIChatbot: React.FC = () => {
           </Link>
         );
       }
-      
+
       const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
       return (
         <span key={index} className="whitespace-pre-wrap">
           {boldParts.map((bp, i) => {
-            if (bp.startsWith('**') && bp.endsWith('**')) {
-              return <strong key={i} className="font-black text-slate-900">{bp.slice(2, -2)}</strong>;
+            if (bp.startsWith("**") && bp.endsWith("**")) {
+              return (
+                <strong key={i} className="font-black text-slate-900">
+                  {bp.slice(2, -2)}
+                </strong>
+              );
             }
             return bp;
           })}
@@ -225,16 +323,20 @@ const AIChatbot: React.FC = () => {
               <Bot className="text-white w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="text-[13px] font-extrabold text-slate-900 leading-none mb-1">InsurePlan AI Advisor</h2>
+              <h2 className="text-[13px] font-extrabold text-slate-900 leading-none mb-1">
+                InsurePlan AI Advisor
+              </h2>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Grounded in 2026 Dataset</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  Grounded in 2026 Dataset
+                </span>
               </div>
             </div>
           </div>
-          
+
           <div className="relative group">
-            <button 
+            <button
               onClick={handleReset}
               className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-slate-100 rounded-full transition-all outline-none"
             >
@@ -249,40 +351,63 @@ const AIChatbot: React.FC = () => {
         </div>
       </div>
 
-      <div 
+      <div
         ref={scrollRef}
         className="flex-grow overflow-y-auto px-4 py-8 scroll-smooth custom-scrollbar"
       >
         <div className="max-w-3xl mx-auto space-y-10">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex gap-4 max-w-[90%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${
-                  msg.role === 'user' ? 'bg-blue-600 text-white border-blue-500' : 'bg-white text-slate-400 border-slate-200'
-                }`}>
-                  {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`flex gap-4 max-w-[90%] md:max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white border-blue-500"
+                      : "bg-white text-slate-400 border-slate-200"
+                  }`}
+                >
+                  {msg.role === "user" ? (
+                    <User className="w-4 h-4" />
+                  ) : (
+                    <Bot className="w-4 h-4" />
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <div className={`relative group px-5 py-4 rounded-2xl text-[14px] leading-relaxed transition-all shadow-sm ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white border border-blue-500 rounded-tr-none' 
-                      : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none'
-                  }`}>
+                  <div
+                    className={`relative group px-5 py-4 rounded-2xl text-[14px] leading-relaxed transition-all shadow-sm ${
+                      msg.role === "user"
+                        ? "bg-blue-600 text-white border border-blue-500 rounded-tr-none"
+                        : "bg-white text-slate-700 border border-slate-200 rounded-tl-none"
+                    }`}
+                  >
                     <div className="prose prose-slate prose-sm max-w-none">
                       {renderMessageText(msg.text)}
                     </div>
-                    {msg.role === 'bot' && msg.text && !msg.isError && (
-                      <button 
+                    {msg.role === "bot" && msg.text && !msg.isError && (
+                      <button
                         onClick={() => copyToClipboard(msg.text, msg.id)}
                         className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg shadow-sm border border-slate-100"
                         title="Copy message"
                       >
-                        {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     )}
                   </div>
-                  <p className={`text-[9px] font-bold uppercase tracking-widest px-1 ${msg.role === 'user' ? 'text-right text-slate-400' : 'text-slate-300'}`}>
-                    {msg.role === 'user' ? 'Analysis Request' : 'Advisor Insight'}
+                  <p
+                    className={`text-[9px] font-bold uppercase tracking-widest px-1 ${msg.role === "user" ? "text-right text-slate-400" : "text-slate-300"}`}
+                  >
+                    {msg.role === "user"
+                      ? "Analysis Request"
+                      : "Advisor Insight"}
                   </p>
                 </div>
               </div>
@@ -325,16 +450,16 @@ const AIChatbot: React.FC = () => {
               className="flex-grow bg-transparent border-none outline-none py-3 text-[14px] font-medium placeholder:text-slate-300"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
               disabled={isTyping}
             />
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isTyping}
               className={`p-3 rounded-full transition-all active:scale-90 flex-shrink-0 ${
-                !input.trim() || isTyping 
-                  ? 'text-slate-200 bg-transparent' 
-                  : 'text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20'
+                !input.trim() || isTyping
+                  ? "text-slate-200 bg-transparent"
+                  : "text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20"
               }`}
             >
               <Send className="w-5 h-5" />
