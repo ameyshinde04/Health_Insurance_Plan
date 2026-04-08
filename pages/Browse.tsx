@@ -21,7 +21,10 @@ import {
 const Browse: React.FC = () => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [allPlans, setAllPlans] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+  const saved = localStorage.getItem("favorites");
+  return saved ? JSON.parse(saved) : [];
+});
 
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
@@ -40,10 +43,13 @@ const Browse: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("favorites");
-    if (saved) {
-      setFavorites(JSON.parse(saved));
-    }
+    const syncFavorites = () => {
+      const saved = localStorage.getItem("favorites");
+      if (saved) setFavorites(JSON.parse(saved));
+    };
+
+    window.addEventListener("storage", syncFavorites);
+    return () => window.removeEventListener("storage", syncFavorites);
   }, []);
 
   useEffect(() => {
