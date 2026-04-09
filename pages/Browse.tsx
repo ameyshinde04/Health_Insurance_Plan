@@ -22,14 +22,16 @@ const Browse: React.FC = () => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [allPlans, setAllPlans] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<string[]>(() => {
-  const saved = localStorage.getItem("favorites");
-  return saved ? JSON.parse(saved) : [];
-});
+    const saved = localStorage.getItem("favorites");
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
-
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isRestored, setIsRestored] = useState(false);
   const [search, setSearch] = useState("");
+  const isRestoringRef = useRef(true);
   const [metalFilter, setMetalFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
@@ -39,8 +41,42 @@ const Browse: React.FC = () => {
   const [availablePlanTypes, setAvailablePlanTypes] = useState<string[]>([]);
 
   useEffect(() => {
+    const saved = sessionStorage.getItem("browseState");
+
+    if (saved) {
+      const parsed = JSON.parse(saved);
+
+      setPage(parsed.page || 1);
+      setSearch(parsed.search || "");
+      setMetalFilter(parsed.metalFilter || "All");
+      setStateFilter(parsed.stateFilter || "All");
+      setTypeFilter(parsed.typeFilter || "All");
+setStatusFilter(parsed.statusFilter || "All"); 
+    }
+
     fetchPlans();
+
+    // 👇 VERY IMPORTANT
+    setTimeout(() => {
+      isRestoringRef.current = false;
+    }, 0);
   }, []);
+
+  useEffect(() => {
+    if (allPlans.length === 0) return; // 🚀 KEY FIX
+
+    sessionStorage.setItem(
+      "browseState",
+      JSON.stringify({
+        page,
+        search,
+        metalFilter,
+        stateFilter,
+        typeFilter,
+        statusFilter,
+      }),
+    );
+  }, [allPlans, page, search, metalFilter, stateFilter, typeFilter]);
 
   useEffect(() => {
     const syncFavorites = () => {
@@ -76,7 +112,47 @@ const Browse: React.FC = () => {
       return;
     }
 
-    setAllPlans(data as any[]);
+    // STEP 1: Shuffle (to avoid same order every time)
+    const shuffled = (data || []).sort((a, b) =>
+      String(a.PlanId).localeCompare(String(b.PlanId)),
+    );
+
+    // STEP 2: Group by MetalLevel
+    const groups: Record<string, any[]> = {};
+
+    shuffled.forEach((p: any) => {
+      const key = p.MetalLevel ?? "Unknown";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(p);
+    });
+
+    // STEP 3: Pick from each group (balanced mix)
+    const order = [
+      "Gold",
+      "Silver",
+      "Bronze",
+      "Platinum",
+      "Expanded Bronze",
+      "High",
+      "Low",
+    ];
+
+    const balanced: any[] = [];
+
+    order.forEach((level) => {
+      if (groups[level]) {
+        balanced.push(...groups[level]); // take top from each
+      }
+    });
+
+    // STEP 4: fallback (if any remaining)
+    Object.keys(groups).forEach((key) => {
+      if (!order.includes(key)) {
+        balanced.push(...groups[key]);
+      }
+    });
+
+    setAllPlans(balanced);
   }
 
   useEffect(() => {
@@ -196,6 +272,11 @@ const Browse: React.FC = () => {
           ? plan.PlanType === "Indemnity" || plan.PlanType === "Others"
           : plan.PlanType === typeFilter);
 
+      const hasValidDeductible =
+        plan.TEHBDedInnTier1Individual &&
+        plan.TEHBDedInnTier1Individual !== "$0" &&
+        plan.TEHBDedInnTier1Individual !== 0;
+
       return (
         matchesSearch &&
         matchesMetal &&
@@ -219,10 +300,50 @@ const Browse: React.FC = () => {
 
   const paginatedPlans = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredPlans.slice(start, start + PAGE_SIZE);
+
+    const buckets: Record<string, any[]> = {};
+
+    filteredPlans.forEach((p: any) => {
+      const key = p.MetalLevel ?? "Unknown";
+      if (!buckets[key]) buckets[key] = [];
+      buckets[key].push(p);
+    });
+
+    const mixOrder = [
+      "Gold",
+      "Silver",
+      "Bronze",
+      "Platinum",
+      "Expanded Bronze",
+      "High",
+      "Low",
+      "Catastrophic",
+      "Others", // ✅ ADD THIS
+    ];
+
+    const allMixed: any[] = [];
+
+    let i = 0;
+    while (true) {
+      let added = false;
+
+      for (const key of mixOrder) {
+        if (buckets[key] && buckets[key][i]) {
+          allMixed.push(buckets[key][i]);
+          added = true;
+        }
+      }
+
+      if (!added) break;
+      i++;
+    }
+
+    return allMixed.slice(start, start + PAGE_SIZE);
   }, [filteredPlans, page]);
 
   useEffect(() => {
+    if (isRestoringRef.current) return; // 🚀 FINAL FIX
+
     setPage(1);
   }, [search, stateFilter, metalFilter, statusFilter, typeFilter]);
 
@@ -709,11 +830,12 @@ const Browse: React.FC = () => {
                         TEHB Deductible
                       </p>
                       <p className="font-black text-blue-600">
-                        {plan.TEHBDedInnTier1Individual}
+                        {plan.TEHBDedInnTier1Individual || "N/A"}
                       </p>
                     </div>
                     <Link
                       to={`/plan/${plan.PlanId}`}
+                      state={{ fromBrowse: true }} // ✅ ADD THIS LINE
                       className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all inline-block shadow-sm"
                     >
                       <ChevronRight className="w-4 h-4" />
