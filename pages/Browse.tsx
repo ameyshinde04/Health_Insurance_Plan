@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+
 import {
   Search,
   Filter,
@@ -36,31 +37,47 @@ const Browse: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [stateFilter, setStateFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
+  const hasLoadedRef = useRef(false);
   const [viewType, setViewType] = useState<"grid" | "list">("grid");
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [availablePlanTypes, setAvailablePlanTypes] = useState<string[]>([]);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("browseState");
+  const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+const navType = navEntry?.type;
 
-    if (saved) {
-      const parsed = JSON.parse(saved);
+  const savedState = sessionStorage.getItem("browseState");
 
-      setPage(parsed.page || 1);
-      setSearch(parsed.search || "");
-      setMetalFilter(parsed.metalFilter || "All");
-      setStateFilter(parsed.stateFilter || "All");
-      setTypeFilter(parsed.typeFilter || "All");
-setStatusFilter(parsed.statusFilter || "All"); 
-    }
+  // ✅ BACK NAVIGATION → restore
+  if (navType === "back_forward" && savedState) {
+    const parsed = JSON.parse(savedState);
 
-    fetchPlans();
+    setPage(parsed.page || 1);
+    setSearch(parsed.search || "");
+    setMetalFilter(parsed.metalFilter || "All");
+    setStateFilter(parsed.stateFilter || "All");
+    setTypeFilter(parsed.typeFilter || "All");
+    setStatusFilter(parsed.statusFilter || "All");
+  } else {
+    // ✅ FRESH LOAD → reset everything
+    setPage(1);
+    setSearch("");
+    setMetalFilter("All");
+    setStateFilter("All");
+    setTypeFilter("All");
+    setStatusFilter("All");
 
-    // 👇 VERY IMPORTANT
-    setTimeout(() => {
-      isRestoringRef.current = false;
-    }, 0);
-  }, []);
+    sessionStorage.removeItem("browseState"); // 🔥 important
+  }
+
+  fetchPlans(); // always fetch clean data
+
+  setTimeout(() => {
+    isRestoringRef.current = false;
+    setIsInitialLoad(false);
+  }, 0);
+}, []);
+
 
   useEffect(() => {
     if (allPlans.length === 0) return; // 🚀 KEY FIX
@@ -76,7 +93,7 @@ setStatusFilter(parsed.statusFilter || "All");
         statusFilter,
       }),
     );
-  }, [allPlans, page, search, metalFilter, stateFilter, typeFilter]);
+  }, [allPlans, page, search, metalFilter, stateFilter, typeFilter, statusFilter]);
 
   useEffect(() => {
     const syncFavorites = () => {
@@ -100,7 +117,7 @@ setStatusFilter(parsed.statusFilter || "All");
     );
   };
 
-  async function fetchPlans() {
+  async function fetchPlans(isFresh = false) {
     const { data, error } = await supabase
       .from("health_insurance_plan")
       .select("*");
@@ -112,47 +129,13 @@ setStatusFilter(parsed.statusFilter || "All");
       return;
     }
 
-    // STEP 1: Shuffle (to avoid same order every time)
-    const shuffled = (data || []).sort((a, b) =>
-      String(a.PlanId).localeCompare(String(b.PlanId)),
-    );
+    const shuffled = data || []; // ✅ NO SHUFFLE
 
-    // STEP 2: Group by MetalLevel
-    const groups: Record<string, any[]> = {};
-
-    shuffled.forEach((p: any) => {
-      const key = p.MetalLevel ?? "Unknown";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(p);
-    });
-
-    // STEP 3: Pick from each group (balanced mix)
-    const order = [
-      "Gold",
-      "Silver",
-      "Bronze",
-      "Platinum",
-      "Expanded Bronze",
-      "High",
-      "Low",
-    ];
-
-    const balanced: any[] = [];
-
-    order.forEach((level) => {
-      if (groups[level]) {
-        balanced.push(...groups[level]); // take top from each
-      }
-    });
-
-    // STEP 4: fallback (if any remaining)
-    Object.keys(groups).forEach((key) => {
-      if (!order.includes(key)) {
-        balanced.push(...groups[key]);
-      }
-    });
+    const balanced = shuffled; // ✅ keep original order
 
     setAllPlans(balanced);
+
+  
   }
 
   useEffect(() => {
@@ -343,6 +326,7 @@ setStatusFilter(parsed.statusFilter || "All");
 
   useEffect(() => {
     if (isRestoringRef.current) return; // 🚀 FINAL FIX
+     if (isInitialLoad) return; // ✅ ADD THIS
 
     setPage(1);
   }, [search, stateFilter, metalFilter, statusFilter, typeFilter]);
@@ -525,7 +509,7 @@ setStatusFilter(parsed.statusFilter || "All");
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
         <aside className="lg:col-span-1">
           <div className="sticky top-24 space-y-6">
-            <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm hover:shadow-md transition-all p-6 flex flex-col h-full">
               <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-transparent">
                 <h3 className="font-bold text-[#1E293B] uppercase tracking-[0.1em] text-[13px] flex items-center">
                   <Filter className="w-4 h-4 mr-3 text-blue-600" />
@@ -773,7 +757,7 @@ setStatusFilter(parsed.statusFilter || "All");
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-black text-slate-900 leading-tight">
+                      <h3 className="font-black text-slate-900 leading-tight min-h-[48px]">
                         {plan.PlanVariantMarketingName}
                       </h3>
                       <p className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter mt-1">
@@ -796,7 +780,7 @@ setStatusFilter(parsed.statusFilter || "All");
                       ❤️
                     </button>
                   </div>
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-3 mb-4 flex-grow">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">
                         StateCode
@@ -824,7 +808,7 @@ setStatusFilter(parsed.statusFilter || "All");
                       </span>
                     </div>
                   </div>
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div className="pt-4 border-t border-slate-200 flex items-center justify-between mt-auto">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">
                         TEHB Deductible
@@ -903,7 +887,11 @@ setStatusFilter(parsed.statusFilter || "All");
                         {plan.PlanType}
                       </td>
                       <td className="px-6 py-7 text-right font-black text-blue-600">
-                        {plan.TEHBDedInnTier1Individual}
+                        {plan.TEHBDedInnTier1Individual &&
+                        plan.TEHBDedInnTier1Individual !== "$0" &&
+                        plan.TEHBDedInnTier1Individual !== 0
+                          ? plan.TEHBDedInnTier1Individual
+                          : "N/A"}
                       </td>
                       <td className="px-8 py-7">
                         <div className="flex items-center justify-end gap-2">
