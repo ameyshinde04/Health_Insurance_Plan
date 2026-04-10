@@ -84,7 +84,7 @@ const Compare: React.FC = () => {
     { label: "Plan Type", key: "PlanType" },
     { label: "Individual Deductible", key: "TEHBDedInnTier1Individual" },
     {
-      label: "Family (Per Person) Ded.",
+      label: "Family Deductible",
       key: "TEHBDedInnTier1FamilyPerPerson",
     },
     { label: "Individual MOOP", key: "TEHBInnTier1IndividualMOOP" },

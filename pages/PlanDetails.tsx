@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { Mail } from "lucide-react";
 
 import {
   ArrowLeft,
@@ -242,9 +243,9 @@ const PlanDetails: React.FC = () => {
           <Section title="External References & Documents" icon={LinkIcon}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
               <ExternalLinkItem
-                label="Summary of Benefits (SBC)"
-                url={plan.URLForSummaryofBenefitsCoverage}
-                icon={FileCheck}
+                label="Tech POC Email"
+                url={`https://mail.google.com/mail/?view=cm&to=${plan.Tech_POC_Email}`}
+                icon={Mail}
               />
               <ExternalLinkItem
                 label="Enrollment Payment"
