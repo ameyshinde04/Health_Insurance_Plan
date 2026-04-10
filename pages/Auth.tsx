@@ -1,15 +1,27 @@
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Shield,
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  AlertCircle,
+  Loader2,
+  Info,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, User, ArrowRight, AlertCircle, Loader2, Info, Eye, EyeOff } from 'lucide-react';
-
-const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
+const Auth: React.FC<{ type: "login" | "signup" }> = ({ type }) => {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { login, signup } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email: string) => {
@@ -17,61 +29,70 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
     return emailRegex.test(email);
   };
 
+  const getFirebaseErrorMessage = (errorCode: string): string => {
+    switch (errorCode) {
+      case "auth/email-already-in-use":
+        return "An account with this email already exists.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/operation-not-allowed":
+        return "Email/password accounts are not enabled. Please contact support.";
+      case "auth/weak-password":
+        return "Password should be at least 6 characters.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Please contact support.";
+      case "auth/user-not-found":
+        return "No account found with this email address.";
+      case "auth/wrong-password":
+        return "Incorrect password. Please try again.";
+      case "auth/invalid-credential":
+        return "Invalid email or password. Please try again or create an account.";
+      case "auth/too-many-requests":
+        return "Too many failed attempts. Please try again later.";
+      default:
+        return "An error occurred. Please try again.";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
+    setError("");
+
     // Proper Authentication Format Validation
     if (!validateEmail(email)) {
-      setError("Please enter a valid professional email address (e.g., name@company.com).");
+      setError(
+        "Please enter a valid professional email address (e.g., name@company.com)."
+      );
       return;
     }
 
     setIsLoading(true);
 
-    // Simulate network delay for "Full Authentication" feel
-    await new Promise(resolve => setTimeout(resolve, 800));
-
     try {
-      if (type === 'signup') {
+      if (type === "signup") {
         // Name validation
         if (name.trim().length < 2) {
           throw new Error("Please enter your full name.");
         }
-        
+
         // Basic password criteria: Minimum 6 characters
         if (password.length < 6) {
           throw new Error("Password must be at least 6 characters long.");
         }
 
-        // Mock account creation
-        const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-        if (users.find((u: any) => u.email === email)) {
-          throw new Error("An account with this email already exists.");
-        }
-
-        const newUser = { name, email, password };
-        users.push(newUser);
-        localStorage.setItem('mock_users', JSON.stringify(users));
-        localStorage.setItem('userName', name);
-        localStorage.setItem('userEmail', email);
-        
-        navigate('/dashboard');
+        await signup(email, password, name);
+        navigate("/dashboard");
       } else {
-        // Mock login check
-        const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-        const user = users.find((u: any) => u.email === email && u.password === password);
-
-        if (!user) {
-          throw new Error("Invalid email or password. Please try again or create an account.");
-        }
-
-        localStorage.setItem('userName', user.name);
-        localStorage.setItem('userEmail', user.email);
-        navigate('/dashboard');
+        await login(email, password);
+        navigate("/dashboard");
       }
     } catch (err: any) {
-      setError(err.message);
+      // Handle Firebase errors
+      if (err.code) {
+        setError(getFirebaseErrorMessage(err.code));
+      } else {
+        setError(err.message || "An error occurred. Please try again.");
+      }
       setIsLoading(false);
     }
   };
@@ -84,12 +105,12 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
             <Shield className="w-8 h-8" />
           </div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {type === 'login' ? 'Welcome back' : 'Join InsurePlan'}
+            {type === "login" ? "Welcome back" : "Join InsurePlan"}
           </h2>
           <p className="mt-2 text-slate-500 font-medium">
-            {type === 'login' 
-              ? 'Enter your credentials to access the explorer' 
-              : 'Create your account to start exploring the 2026 dataset'}
+            {type === "login"
+              ? "Enter your credentials to access the explorer"
+              : "Create your account to start exploring the 2026 dataset"}
           </p>
         </div>
 
@@ -102,9 +123,11 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {type === 'signup' && (
+            {type === "signup" && (
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Full Name</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                  Full Name
+                </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
@@ -118,20 +141,24 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
                 </div>
               </div>
             )}
-            
+
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Email Address</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Email Address
+              </label>
               <div className="relative">
-                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${email && !validateEmail(email) ? 'text-red-400' : 'text-slate-400'}`} />
+                <Mail
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${email && !validateEmail(email) ? "text-red-400" : "text-slate-400"}`}
+                />
                 <input
                   type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 transition-all font-medium ${
-                    email && !validateEmail(email) 
-                      ? 'border-red-200 focus:ring-red-500/10 focus:border-red-400' 
-                      : 'border-slate-200 focus:ring-blue-500/10 focus:border-blue-500'
+                    email && !validateEmail(email)
+                      ? "border-red-200 focus:ring-red-500/10 focus:border-red-400"
+                      : "border-slate-200 focus:ring-blue-500/10 focus:border-blue-500"
                   }`}
                   placeholder="name@company.com"
                 />
@@ -139,7 +166,9 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Password</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
@@ -155,10 +184,14 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
-              {type === 'signup' && (
+              {type === "signup" && (
                 <div className="mt-2 flex items-center space-x-1.5 text-[11px] text-slate-400 font-medium">
                   <span className="flex items-center space-x-1">
                     <Info className="w-3 h-3" />
@@ -178,20 +211,22 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <span>{type === 'login' ? 'Sign In' : 'Create Account'}</span>
+                    <span>{type === "login" ? "Sign In" : "Create Account"}</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </button>
-              
+
               <div className="mt-4 text-center">
                 <p className="text-sm text-slate-500 font-medium">
-                  {type === 'login' ? "Don't have an account?" : "Already have an account?"}
+                  {type === "login"
+                    ? "Don't have an account?"
+                    : "Already have an account?"}
                   <Link
-                    to={type === 'login' ? '/signup' : '/login'}
+                    to={type === "login" ? "/signup" : "/login"}
                     className="ml-1.5 text-blue-600 font-bold hover:text-blue-700 hover:underline decoration-2 underline-offset-4 transition-colors"
                   >
-                    {type === 'login' ? 'Create one' : 'Log in here'}
+                    {type === "login" ? "Create one" : "Log in here"}
                   </Link>
                 </p>
               </div>

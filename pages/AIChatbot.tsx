@@ -1,6 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  getChatHistory,
+  saveChatHistory,
+  clearChatHistory,
+  ChatMessage,
+} from "../lib/firestore";
 
 import {
   Send,
@@ -13,6 +20,7 @@ import {
   ShieldCheck,
   Sparkles,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { GoogleGenAI } from "@google/genai";
 
@@ -21,46 +29,41 @@ interface Message {
   role: "user" | "bot";
   text: string;
   isError?: boolean;
+  timestamp?: Date;
 }
 
-const STORAGE_KEY = "insureplan_chat_history";
 const INITIAL_MESSAGE: Message = {
   id: "1",
   role: "bot",
-  text: `Hi 👋 I'm your **InsurePlan AI Advisor**.
+  text: `Hi, I'm your **InsurePlan AI Advisor**.
 
-Instead of browsing hundreds of plans, I’ll help you quickly find the best one based on cost, coverage, and your needs.
+Instead of browsing hundreds of plans, I'll help you quickly find the best one based on cost, coverage, and your needs.
 
 Tell me:
-• Your state  
-• Whether you prefer low monthly cost or low medical risk  
-• Any specific requirements  
+- Your state  
+- Whether you prefer low monthly cost or low medical risk  
+- Any specific requirements  
 
-Or choose a quick option below 👇`,
+Or choose a quick option below.`,
+  timestamp: new Date(),
 };
 
 const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
-  // Load initial messages from sessionStorage
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [INITIAL_MESSAGE];
-    } catch (e) {
-      return [INITIAL_MESSAGE];
-    }
-  });
-
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hasLoadedRef = useRef(false);
 
   const suggestions = selectedPlan
     ? [
         `Is this plan good for diabetes treatment?`,
         `What will I pay for a fracture in this plan?`,
-        `Is deductible ₹${selectedPlan.TEHBDedInnTier1Individual} high?`,
+        `Is deductible ${selectedPlan.TEHBDedInnTier1Individual} high?`,
         `Compare this plan with better options`,
         `Is this plan good for families?`,
       ]
@@ -72,17 +75,74 @@ const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
         "Find plans good for diabetes",
       ];
 
-  // Persist messages to sessionStorage whenever they change
+  // Load chat history from Firebase
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  }, [messages]);
+    const loadChatHistory = async () => {
+      if (!user || hasLoadedRef.current) return;
+
+      try {
+        setIsLoadingHistory(true);
+        const history = await getChatHistory(user.uid);
+
+        if (history.length > 0) {
+          const loadedMessages: Message[] = history.map((msg, index) => ({
+            id: `loaded-${index}-${Date.now()}`,
+            role: msg.role,
+            text: msg.text,
+            isError: msg.isError,
+            timestamp: msg.timestamp,
+          }));
+          setMessages(loadedMessages);
+        }
+        hasLoadedRef.current = true;
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadChatHistory();
+  }, [user]);
+
+  // Save chat history to Firebase (debounced)
+  const saveToFirebase = useCallback(
+    async (messagesToSave: Message[]) => {
+      if (!user || messagesToSave.length === 0) return;
+
+      try {
+        const chatMessages: ChatMessage[] = messagesToSave.map((msg) => ({
+          role: msg.role,
+          text: msg.text,
+          isError: msg.isError,
+          timestamp: msg.timestamp || new Date(),
+        }));
+
+        await saveChatHistory(user.uid, chatMessages);
+      } catch (error) {
+        console.error("Error saving chat history:", error);
+      }
+    },
+    [user]
+  );
+
+  // Save messages when they change (with debounce)
+  useEffect(() => {
+    if (!hasLoadedRef.current || messages.length === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      saveToFirebase(messages);
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [messages, saveToFirebase]);
 
   useEffect(() => {
     const fetchPlans = async () => {
       const { data, error } = await supabase
         .from("health_insurance_plan")
         .select("*")
-        .limit(200); // IMPORTANT: don't load all 22k
+        .limit(200);
 
       if (!error && data) {
         setPlans(data);
@@ -109,21 +169,42 @@ const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleReset = () => {
-  sessionStorage.removeItem(STORAGE_KEY);
+  const handleReset = async () => {
+    if (user) {
+      try {
+        await clearChatHistory(user.uid);
+      } catch (error) {
+        console.error("Error clearing chat history:", error);
+      }
+    }
 
-  setMessages([
-    {
-      id: Date.now().toString(),
-      role: "bot" as const,
-      text: "Session restarted ✅ Let's find the best plan for you.",
-    },
-    INITIAL_MESSAGE,
-  ]);
-};
+    setMessages([
+      {
+        id: Date.now().toString(),
+        role: "bot" as const,
+        text: "Session restarted. Let's find the best plan for you.",
+        timestamp: new Date(),
+      },
+      { ...INITIAL_MESSAGE, id: (Date.now() + 1).toString() },
+    ]);
+  };
+
+  if (isLoadingHistory) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <p className="text-slate-500 font-medium">Loading your chat history...</p>
+      </div>
+    );
+  }
 
   if (plans.length === 0) {
-    return <div className="p-6">Loading plans...</div>;
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+        <p className="text-slate-500 font-medium">Loading plans...</p>
+      </div>
+    );
   }
 
   const handleSend = async (textOverride?: string) => {
@@ -135,6 +216,7 @@ const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
       id: userMsgId,
       role: "user",
       text: textToUse,
+      timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -204,7 +286,10 @@ Always ask 2 helpful follow-up questions.
         config: { systemInstruction, temperature: 0.1 },
       });
 
-      setMessages((prev) => [...prev, { id: botMsgId, role: "bot", text: "" }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: botMsgId, role: "bot", text: "", timestamp: new Date() },
+      ]);
 
       for await (const chunk of responseStream) {
         const chunkText = chunk.text;
@@ -212,8 +297,8 @@ Always ask 2 helpful follow-up questions.
           accumulatedText += chunkText;
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === botMsgId ? { ...m, text: accumulatedText } : m,
-            ),
+              m.id === botMsgId ? { ...m, text: accumulatedText } : m
+            )
           );
         }
       }
@@ -225,6 +310,7 @@ Always ask 2 helpful follow-up questions.
           role: "bot",
           text: "I'm having trouble connecting to my registry right now. Please try again in a moment.",
           isError: true,
+          timestamp: new Date(),
         },
       ]);
     } finally {
@@ -239,7 +325,7 @@ Always ask 2 helpful follow-up questions.
       if (match) {
         const planId = match[1];
         const plan = plans.find(
-          (p) => p.PlanId === planId || p.StandardComponentId === planId,
+          (p) => p.PlanId === planId || p.StandardComponentId === planId
         );
         if (!plan) return null;
 

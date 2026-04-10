@@ -1,6 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import { getFavorites, addFavorite, removeFavorite } from "../lib/firestore";
 
 import {
   Search,
@@ -17,15 +19,15 @@ import {
   Layers,
   Shield,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 const Browse: React.FC = () => {
+  const { user } = useAuth();
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [allPlans, setAllPlans] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem("favorites");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
 
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
@@ -41,6 +43,27 @@ const Browse: React.FC = () => {
   const [viewType, setViewType] = useState<"grid" | "list">("grid");
   const [availableStates, setAvailableStates] = useState<string[]>([]);
   const [availablePlanTypes, setAvailablePlanTypes] = useState<string[]>([]);
+
+  // Load favorites from Firebase
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) {
+        setIsLoadingFavorites(false);
+        return;
+      }
+
+      try {
+        const userFavorites = await getFavorites(user.uid);
+        setFavorites(userFavorites);
+      } catch (error) {
+        console.error("Error loading favorites:", error);
+      } finally {
+        setIsLoadingFavorites(false);
+      }
+    };
+
+    loadFavorites();
+  }, [user]);
 
   useEffect(() => {
     const savedState = sessionStorage.getItem("browseState");
@@ -95,27 +118,35 @@ const Browse: React.FC = () => {
     statusFilter,
   ]);
 
-  useEffect(() => {
-    const syncFavorites = () => {
-      const saved = localStorage.getItem("favorites");
-      if (saved) setFavorites(JSON.parse(saved));
-    };
+  // Toggle favorite in Firebase
+  const toggleFavorite = useCallback(async (planId: string) => {
+    if (!user) return;
 
-    window.addEventListener("storage", syncFavorites);
-    return () => window.removeEventListener("storage", syncFavorites);
-  }, []);
+    const isFavorited = favorites.includes(planId);
 
-  useEffect(() => {
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-  }, [favorites]);
-
-  const toggleFavorite = (planId: string) => {
+    // Optimistic update
     setFavorites((prev) =>
-      prev.includes(planId)
+      isFavorited
         ? prev.filter((id) => id !== planId)
-        : [...prev, planId],
+        : [...prev, planId]
     );
-  };
+
+    try {
+      if (isFavorited) {
+        await removeFavorite(user.uid, planId);
+      } else {
+        await addFavorite(user.uid, planId);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      // Revert on error
+      setFavorites((prev) =>
+        isFavorited
+          ? [...prev, planId]
+          : prev.filter((id) => id !== planId)
+      );
+    }
+  }, [user, favorites]);
 
   async function fetchPlans(isFresh = false) {
     const { data, error } = await supabase

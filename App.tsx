@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
   Home, Search, LayoutDashboard, MessageSquare, 
   BarChart2, User, LogIn, UserPlus, Shield, ChevronRight, Menu, X,
   ArrowRightLeft
 } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Browse from './pages/Browse';
@@ -14,6 +15,25 @@ import Compare from './pages/Compare';
 import AIChatbot from './pages/AIChatbot';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,22 +121,23 @@ const Navbar = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        <Navbar />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Auth type="login" />} />
-            <Route path="/signup" element={<Auth type="signup" />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/browse" element={<Browse />} />
-            <Route path="/plan/:id" element={<PlanDetails />} />
-            <Route path="/compare" element={<Compare />} />
-            <Route path="/chatbot" element={<AIChatbot />} />
-            <Route path="/profile" element={<Profile />} />
-          </Routes>
-        </main>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          <Navbar />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Auth type="login" />} />
+              <Route path="/signup" element={<Auth type="signup" />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/browse" element={<ProtectedRoute><Browse /></ProtectedRoute>} />
+              <Route path="/plan/:id" element={<ProtectedRoute><PlanDetails /></ProtectedRoute>} />
+              <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
+              <Route path="/chatbot" element={<ProtectedRoute><AIChatbot /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            </Routes>
+          </main>
         
         <footer className="bg-slate-950 border-t border-slate-800 py-12 mt-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -163,7 +184,8 @@ const App: React.FC = () => {
           </div>
         </footer>
       </div>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 };
 

@@ -7,25 +7,50 @@ import {
   Shield,
   LogOut,
   ChevronRight,
+  Heart,
+  MessageSquare,
+  Loader2,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { getFavorites, getChatHistory } from "../lib/firestore";
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
-  const [userName, setUserName] = useState("Technical User");
+  const { user, userProfile, logout, loading: authLoading } = useAuth();
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [chatMessagesCount, setChatMessagesCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("userName");
-    if (savedName) {
-      setUserName(savedName);
-    }
-  }, []);
+    const loadUserData = async () => {
+      if (!user) return;
 
-  const handleLogout = () => {
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    // Clear chat history on logout
-    sessionStorage.removeItem("insureplan_chat_history");
-    navigate("/login");
+      try {
+        setIsLoading(true);
+        const [favorites, chatHistory] = await Promise.all([
+          getFavorites(user.uid),
+          getChatHistory(user.uid),
+        ]);
+
+        setFavoritesCount(favorites.length);
+        setChatMessagesCount(chatHistory.length);
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [user]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
   };
 
   const settingsItems = [
@@ -46,6 +71,17 @@ const Profile: React.FC = () => {
     },
   ];
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  const displayName = userProfile?.displayName || user?.displayName || "User";
+  const email = userProfile?.email || user?.email || "";
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-8">
@@ -59,9 +95,10 @@ const Profile: React.FC = () => {
             </div>
             <div className="mt-14 text-center md:text-left">
               <h1 className="text-2xl font-extrabold text-slate-900">
-                {userName}
+                {displayName}
               </h1>
-              <p className="text-slate-500 font-medium">
+              <p className="text-slate-500 font-medium">{email}</p>
+              <p className="text-slate-400 text-sm mt-1">
                 PlanId Registry Access
               </p>
             </div>
@@ -94,38 +131,57 @@ const Profile: React.FC = () => {
 
             <div className="space-y-4">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">
-                Data Activity Log
+                Your Data
               </h3>
               <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
-                      PlanId Views
-                    </p>
-                    <p className="text-2xl font-black text-slate-800">12</p>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
-                      Column Queries
-                    </p>
-                    <p className="text-2xl font-black text-slate-800">45</p>
-                  </div>
-                  <div className="col-span-2 mt-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
-                      Data Access Level
-                    </p>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-grow h-1.5 bg-slate-200 rounded-full">
-                        <div className="w-2/3 h-full bg-blue-600 rounded-full"></div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-red-50">
+                        <Heart className="w-5 h-5 text-red-500" />
                       </div>
-                      <span className="text-xs font-black text-blue-600">
-                        Enterprise
-                      </span>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
+                          Saved Plans
+                        </p>
+                        <p className="text-2xl font-black text-slate-800">
+                          {favoritesCount}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-blue-50">
+                        <MessageSquare className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
+                          Chat Messages
+                        </p>
+                        <p className="text-2xl font-black text-slate-800">
+                          {chatMessagesCount}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-span-2 mt-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase mb-1">
+                        Data Access Level
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-grow h-1.5 bg-slate-200 rounded-full">
+                          <div className="w-2/3 h-full bg-blue-600 rounded-full"></div>
+                        </div>
+                        <span className="text-xs font-black text-blue-600">
+                          Enterprise
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-              {/* ✅ LOGOUT OUTSIDE BOX */}
               <div className="flex justify-end pr-2">
                 <button
                   onClick={handleLogout}
