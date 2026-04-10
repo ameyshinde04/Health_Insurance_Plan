@@ -131,7 +131,7 @@ const PlanDetails: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <button
-        onClick={() => navigate("/browse")}
+        onClick={() => navigate(-1)}
         className="inline-flex items-center text-sm font-semibold text-slate-500 hover:text-blue-600 mb-8 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />

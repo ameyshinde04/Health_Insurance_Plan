@@ -43,41 +43,33 @@ const Browse: React.FC = () => {
   const [availablePlanTypes, setAvailablePlanTypes] = useState<string[]>([]);
 
   useEffect(() => {
-  const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-const navType = navEntry?.type;
+    const savedState = sessionStorage.getItem("browseState");
 
-  const savedState = sessionStorage.getItem("browseState");
+    if (savedState) {
+      const parsed = JSON.parse(savedState);
 
-  // ✅ BACK NAVIGATION → restore
-  if (navType === "back_forward" && savedState) {
-    const parsed = JSON.parse(savedState);
+      setPage(parsed.page || 1);
+      setSearch(parsed.search || "");
+      setMetalFilter(parsed.metalFilter || "All");
+      setStateFilter(parsed.stateFilter || "All");
+      setTypeFilter(parsed.typeFilter || "All");
+      setStatusFilter(parsed.statusFilter || "All");
+    } else {
+      setPage(1);
+      setSearch("");
+      setMetalFilter("All");
+      setStateFilter("All");
+      setTypeFilter("All");
+      setStatusFilter("All");
+    }
 
-    setPage(parsed.page || 1);
-    setSearch(parsed.search || "");
-    setMetalFilter(parsed.metalFilter || "All");
-    setStateFilter(parsed.stateFilter || "All");
-    setTypeFilter(parsed.typeFilter || "All");
-    setStatusFilter(parsed.statusFilter || "All");
-  } else {
-    // ✅ FRESH LOAD → reset everything
-    setPage(1);
-    setSearch("");
-    setMetalFilter("All");
-    setStateFilter("All");
-    setTypeFilter("All");
-    setStatusFilter("All");
+    fetchPlans(); // always fetch clean data
 
-    sessionStorage.removeItem("browseState"); // 🔥 important
-  }
-
-  fetchPlans(); // always fetch clean data
-
-  setTimeout(() => {
-    isRestoringRef.current = false;
-    setIsInitialLoad(false);
-  }, 0);
-}, []);
-
+    setTimeout(() => {
+      isRestoringRef.current = false;
+      setIsInitialLoad(false);
+    }, 0);
+  }, []);
 
   useEffect(() => {
     if (allPlans.length === 0) return; // 🚀 KEY FIX
@@ -93,7 +85,15 @@ const navType = navEntry?.type;
         statusFilter,
       }),
     );
-  }, [allPlans, page, search, metalFilter, stateFilter, typeFilter, statusFilter]);
+  }, [
+    allPlans,
+    page,
+    search,
+    metalFilter,
+    stateFilter,
+    typeFilter,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     const syncFavorites = () => {
@@ -134,8 +134,6 @@ const navType = navEntry?.type;
     const balanced = shuffled; // ✅ keep original order
 
     setAllPlans(balanced);
-
-  
   }
 
   useEffect(() => {
@@ -326,7 +324,7 @@ const navType = navEntry?.type;
 
   useEffect(() => {
     if (isRestoringRef.current) return; // 🚀 FINAL FIX
-     if (isInitialLoad) return; // ✅ ADD THIS
+    if (isInitialLoad) return; // ✅ ADD THIS
 
     setPage(1);
   }, [search, stateFilter, metalFilter, statusFilter, typeFilter]);
