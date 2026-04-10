@@ -5,7 +5,10 @@ import { InsurancePlan } from "../types";
 import { Plus, X, ArrowRightLeft, Info } from "lucide-react";
 
 const Compare: React.FC = () => {
-  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>(() => {
+    const saved = sessionStorage.getItem("comparePlans");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [plans, setPlans] = useState<InsurancePlan[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const suggestedPlans = [
@@ -23,6 +26,10 @@ const Compare: React.FC = () => {
       ),
     )
     .slice(0, 5); // 👈 only 5 suggestions
+
+  useEffect(() => {
+    sessionStorage.setItem("comparePlans", JSON.stringify(selectedPlanIds));
+  }, [selectedPlanIds]);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -44,7 +51,7 @@ const Compare: React.FC = () => {
     if (selectedPlanIds.includes(id)) {
       setSelectedPlanIds(selectedPlanIds.filter((pid) => pid !== id));
     } else if (selectedPlanIds.length < 4) {
-      setSelectedPlanIds([...selectedPlanIds, id]);
+      setSelectedPlanIds((prev) => [...new Set([...prev, id])]);
     }
   };
 
@@ -138,7 +145,9 @@ const Compare: React.FC = () => {
         )}
       </div>
 
-      {selectedPlans.length === 0 ? (
+      {plans.length === 0 ? (
+        <div className="text-center py-20">Loading plans...</div>
+      ) : selectedPlans.length === 0 ? (
         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-24 text-center">
           <Info className="w-12 h-12 text-slate-300 mx-auto mb-6" />
           <h2 className="text-xl font-bold text-slate-400">
