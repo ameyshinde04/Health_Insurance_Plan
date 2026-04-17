@@ -25,6 +25,7 @@ export interface FavoriteData {
 
 export const getFavorites = async (userId: string): Promise<string[]> => {
   try {
+    await setDoc(doc(db, "users", userId), {}, { merge: true });
     const docRef = doc(db, "users", userId, "data", "favorites");
     const docSnap = await getDoc(docRef);
 
@@ -43,6 +44,7 @@ export const addFavorite = async (
   planId: string
 ): Promise<void> => {
   try {
+    await setDoc(doc(db, "users", userId), {}, { merge: true });
     const docRef = doc(db, "users", userId, "data", "favorites");
     const docSnap = await getDoc(docRef);
 
@@ -59,6 +61,7 @@ export const addFavorite = async (
     }
   } catch (error) {
     console.error("Error adding favorite:", error);
+alert("Firestore error: " + (error as any).message);
     throw error;
   }
 };
@@ -68,6 +71,7 @@ export const removeFavorite = async (
   planId: string
 ): Promise<void> => {
   try {
+    await setDoc(doc(db, "users", userId), {}, { merge: true });
     const docRef = doc(db, "users", userId, "data", "favorites");
     await updateDoc(docRef, {
       planIds: arrayRemove(planId),

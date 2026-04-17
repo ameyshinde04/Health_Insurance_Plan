@@ -1,10 +1,12 @@
 
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, User, ArrowRight, AlertCircle, Loader2, Info, Eye, EyeOff } from 'lucide-react';
 
 const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
   const navigate = useNavigate();
+  const { signup, login } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,9 +21,8 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
-    // Proper Authentication Format Validation
+    setError("");
+
     if (!validateEmail(email)) {
       setError("Please enter a valid professional email address (e.g., name@company.com).");
       return;
@@ -29,49 +30,23 @@ const Auth: React.FC<{ type: 'login' | 'signup' }> = ({ type }) => {
 
     setIsLoading(true);
 
-    // Simulate network delay for "Full Authentication" feel
-    await new Promise(resolve => setTimeout(resolve, 800));
-
     try {
-      if (type === 'signup') {
-        // Name validation
+      if (type === "signup") {
         if (name.trim().length < 2) {
           throw new Error("Please enter your full name.");
         }
-        
-        // Basic password criteria: Minimum 6 characters
         if (password.length < 6) {
           throw new Error("Password must be at least 6 characters long.");
         }
-
-        // Mock account creation
-        const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-        if (users.find((u: any) => u.email === email)) {
-          throw new Error("An account with this email already exists.");
-        }
-
-        const newUser = { name, email, password };
-        users.push(newUser);
-        localStorage.setItem('mock_users', JSON.stringify(users));
-        localStorage.setItem('userName', name);
-        localStorage.setItem('userEmail', email);
-        
-        navigate('/dashboard');
+        await signup(email, password, name);
+        navigate("/dashboard");
       } else {
-        // Mock login check
-        const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-        const user = users.find((u: any) => u.email === email && u.password === password);
-
-        if (!user) {
-          throw new Error("Invalid email or password. Please try again or create an account.");
-        }
-
-        localStorage.setItem('userName', user.name);
-        localStorage.setItem('userEmail', user.email);
-        navigate('/dashboard');
+        await login(email, password);
+        navigate("/dashboard");
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Authentication failed. Please try again.");
+    } finally {
       setIsLoading(false);
     }
   };

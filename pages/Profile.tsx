@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   User,
@@ -8,23 +8,17 @@ import {
   LogOut,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
-  const [userName, setUserName] = useState("Technical User");
+  const { user, userProfile, logout } = useAuth();
 
-  useEffect(() => {
-    const savedName = localStorage.getItem("userName");
-    if (savedName) {
-      setUserName(savedName);
-    }
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
+  const handleLogout = async () => {
     // Clear chat history on logout
     sessionStorage.removeItem("insureplan_chat_history");
+    await logout();
     navigate("/login");
   };
 
@@ -59,7 +53,7 @@ const Profile: React.FC = () => {
             </div>
             <div className="mt-14 text-center md:text-left">
               <h1 className="text-2xl font-extrabold text-slate-900">
-                {userName}
+                {userProfile?.displayName || user?.displayName || user?.email || "User"}
               </h1>
               <p className="text-slate-500 font-medium">
                 PlanId Registry Access

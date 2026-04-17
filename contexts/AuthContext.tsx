@@ -9,12 +9,13 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase.ts";
+import { Timestamp } from "firebase/firestore";
 
 interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
-  createdAt: Date;
+  createdAt: Timestamp;
 }
 
 interface AuthContextType {
@@ -60,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
-            createdAt: new Date(),
+            createdAt: Timestamp.now(),
           };
           await setDoc(userDocRef, newProfile);
           setUserProfile(newProfile);
@@ -94,10 +95,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       uid: userCredential.user.uid,
       email: userCredential.user.email,
       displayName: name,
-      createdAt: new Date(),
+      createdAt: Timestamp.now(),
     };
 
     await setDoc(doc(db, "users", userCredential.user.uid), userProfile);
+
+    setUserProfile(userProfile);
   };
 
   const logout = async () => {
@@ -114,5 +117,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     logout,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  if (loading) {
+  return <div>Loading...</div>; // or spinner
+}
+
+return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
