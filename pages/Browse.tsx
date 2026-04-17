@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -22,10 +23,8 @@ import {
 const Browse: React.FC = () => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [allPlans, setAllPlans] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem("favorites");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const { getFavorites, addFavorite, removeFavorite, userId } = useAuth();
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
@@ -95,26 +94,24 @@ const Browse: React.FC = () => {
     statusFilter,
   ]);
 
+  // Load favorites from Firestore when userId changes
   useEffect(() => {
-    const syncFavorites = () => {
-      const saved = localStorage.getItem("favorites");
-      if (saved) setFavorites(JSON.parse(saved));
-    };
+    if (!userId) {
+      setFavorites([]);
+      return;
+    }
+    getFavorites().then(setFavorites);
+  }, [userId]);
 
-    window.addEventListener("storage", syncFavorites);
-    return () => window.removeEventListener("storage", syncFavorites);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-  }, [favorites]);
-
-  const toggleFavorite = (planId: string) => {
-    setFavorites((prev) =>
-      prev.includes(planId)
-        ? prev.filter((id) => id !== planId)
-        : [...prev, planId],
-    );
+  const toggleFavorite = async (planId: string) => {
+    if (!userId) return;
+    if (favorites.includes(planId)) {
+      await removeFavorite(planId);
+      setFavorites((prev) => prev.filter((id) => id !== planId));
+    } else {
+      await addFavorite(planId);
+      setFavorites((prev) => [...prev, planId]);
+    }
   };
 
   async function fetchPlans(isFresh = false) {

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -40,15 +41,8 @@ Or choose a quick option below 👇`,
 };
 
 const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
-  // Load initial messages from sessionStorage
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [INITIAL_MESSAGE];
-    } catch (e) {
-      return [INITIAL_MESSAGE];
-    }
-  });
+  const { userId, getChatHistory, saveChatHistory, clearChatHistory } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
 
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -72,10 +66,30 @@ const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
         "Find plans good for diabetes",
       ];
 
-  // Persist messages to sessionStorage whenever they change
+
+  // Load chat history from Firestore when userId changes
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-  }, [messages]);
+    if (!userId) {
+      setMessages([INITIAL_MESSAGE]);
+      return;
+    }
+    getChatHistory().then((msgs) => {
+      if (msgs && msgs.length > 0) {
+        setMessages(msgs);
+      } else {
+        setMessages([INITIAL_MESSAGE]);
+      }
+    });
+    // eslint-disable-next-line
+  }, [userId]);
+
+  // Persist messages to Firestore whenever they change (if user is logged in)
+  useEffect(() => {
+    if (!userId) return;
+    if (messages.length === 1 && messages[0].id === INITIAL_MESSAGE.id) return;
+    saveChatHistory(messages);
+    // eslint-disable-next-line
+  }, [messages, userId]);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -109,18 +123,17 @@ const AIChatbot: React.FC<{ selectedPlan?: any }> = ({ selectedPlan }) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleReset = () => {
-  sessionStorage.removeItem(STORAGE_KEY);
-
-  setMessages([
-    {
-      id: Date.now().toString(),
-      role: "bot" as const,
-      text: "Session restarted ✅ Let's find the best plan for you.",
-    },
-    INITIAL_MESSAGE,
-  ]);
-};
+  const handleReset = async () => {
+    if (userId) await clearChatHistory();
+    setMessages([
+      {
+        id: Date.now().toString(),
+        role: "bot" as const,
+        text: "Session restarted ✅ Let's find the best plan for you.",
+      },
+      INITIAL_MESSAGE,
+    ]);
+  };
 
   if (plans.length === 0) {
     return <div className="p-6">Loading plans...</div>;

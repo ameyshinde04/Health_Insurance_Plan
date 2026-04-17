@@ -1,13 +1,20 @@
 import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { useEffect } from "react";
 import { InsurancePlan } from "../types";
 import { Plus, X, ArrowRightLeft, Info } from "lucide-react";
 
 const Compare: React.FC = () => {
+  const { userId } = useAuth();
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>(() => {
-    const saved = sessionStorage.getItem("comparePlans");
-    return saved ? JSON.parse(saved) : [];
+    if (userId) {
+      const saved = localStorage.getItem(`comparePlans_${userId}`);
+      return saved ? JSON.parse(saved) : [];
+    } else {
+      const saved = sessionStorage.getItem("comparePlans");
+      return saved ? JSON.parse(saved) : [];
+    }
   });
   const [plans, setPlans] = useState<InsurancePlan[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,9 +34,14 @@ const Compare: React.FC = () => {
     )
     .slice(0, 5); // 👈 only 5 suggestions
 
+  // Persist compare plans per user
   useEffect(() => {
-    sessionStorage.setItem("comparePlans", JSON.stringify(selectedPlanIds));
-  }, [selectedPlanIds]);
+    if (userId) {
+      localStorage.setItem(`comparePlans_${userId}`, JSON.stringify(selectedPlanIds));
+    } else {
+      sessionStorage.setItem("comparePlans", JSON.stringify(selectedPlanIds));
+    }
+  }, [selectedPlanIds, userId]);
 
   useEffect(() => {
     const fetchPlans = async () => {

@@ -18,13 +18,32 @@ interface UserProfile {
   createdAt: Timestamp;
 }
 
+// Add types for favorites and chat history
+import {
+  getFavorites,
+  addFavorite,
+  removeFavorite,
+  getChatHistory,
+  saveChatHistory,
+  clearChatHistory,
+} from "../lib/firestore";
+
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  userId: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  // Favorites
+  getFavorites: () => Promise<string[]>;
+  addFavorite: (planId: string) => Promise<void>;
+  removeFavorite: (planId: string) => Promise<void>;
+  // Chat history
+  getChatHistory: () => Promise<any[]>;
+  saveChatHistory: (messages: any[]) => Promise<void>;
+  clearChatHistory: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const userId = user?.uid || null;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -108,13 +128,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUserProfile(null);
   };
 
+  // Favorites helpers
+  const getFavoritesHandler = async () => {
+    if (!userId) return [];
+    return await getFavorites(userId);
+  };
+  const addFavoriteHandler = async (planId: string) => {
+    if (!userId) return;
+    await addFavorite(userId, planId);
+  };
+  const removeFavoriteHandler = async (planId: string) => {
+    if (!userId) return;
+    await removeFavorite(userId, planId);
+  };
+
+  // Chat history helpers
+  const getChatHistoryHandler = async () => {
+    if (!userId) return [];
+    return await getChatHistory(userId);
+  };
+  const saveChatHistoryHandler = async (messages: any[]) => {
+    if (!userId) return;
+    await saveChatHistory(userId, messages);
+  };
+  const clearChatHistoryHandler = async () => {
+    if (!userId) return;
+    await clearChatHistory(userId);
+  };
+
   const value = {
     user,
     userProfile,
     loading,
+    userId,
     login,
     signup,
     logout,
+    getFavorites: getFavoritesHandler,
+    addFavorite: addFavoriteHandler,
+    removeFavorite: removeFavoriteHandler,
+    getChatHistory: getChatHistoryHandler,
+    saveChatHistory: saveChatHistoryHandler,
+    clearChatHistory: clearChatHistoryHandler,
   };
 
   if (loading) {
