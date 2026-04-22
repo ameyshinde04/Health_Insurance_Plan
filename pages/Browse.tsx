@@ -382,6 +382,8 @@ const Browse: React.FC = () => {
         return "bg-slate-200 text-slate-700";
       case "Bronze":
         return "bg-orange-100 text-orange-700";
+      case "Expanded Bronze":
+        return "bg-orange-100 text-orange-900";
       case "High":
         return "bg-purple-100 text-purple-700";
       case "Low":

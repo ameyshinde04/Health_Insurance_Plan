@@ -79,7 +79,7 @@ const Compare: React.FC = () => {
       case "Platinum":
         return "bg-blue-50 text-blue-700 border border-blue-100 shadow-sm";
       case "Expanded Bronze":
-        return "bg-orange-50 text-orange-700 border border-orange-100 shadow-sm";
+        return "bg-orange-100 text-orange-900 border border-orange-100 shadow-sm";
       case "High":
         return "bg-purple-100 text-purple-700 border border-purple-200 shadow-sm";
       case "Low":

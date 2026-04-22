@@ -54,19 +54,19 @@ const Dashboard: React.FC = () => {
     const groups: Record<string, number> = {
       Gold: 0,
       Silver: 0,
-      Bronze: 0,
+      "Expanded Bronze": 0,
       Others: 0,
     };
 
     plans.forEach((p) => {
-      if (["Gold", "Silver", "Bronze"].includes(p.MetalLevel)) {
+      if (["Gold", "Silver", "Expanded Bronze"].includes(p.MetalLevel)) {
         groups[p.MetalLevel] += 1;
       } else {
         groups["Others"] += 1;
       }
     });
 
-    const order = ["Gold", "Silver", "Bronze", "Others"];
+    const order = ["Gold", "Silver", "Expanded Bronze", "Others"];
     return order
       .map((name) => ({ name, count: groups[name] }))
       .filter((item) => item.count > 0);
@@ -82,19 +82,21 @@ const Dashboard: React.FC = () => {
 
     let data;
     if (sortedEntries.length > 5) {
-      const top5 = sortedEntries.slice(0, 5);
-      const othersCount = sortedEntries
-        .slice(5)
-        .reduce((acc, curr) => acc + curr[1], 0);
-      data = [
-        ...top5.map(([name, count]) => ({ name, count })),
-        { name: "Others", count: othersCount },
-      ];
-    } else {
-      data = sortedEntries.map(([name, count]) => ({ name, count }));
-    }
+  const top5 = sortedEntries.slice(0, 5);
+  const othersCount = sortedEntries
+    .slice(5)
+    .reduce((acc, curr) => acc + curr[1], 0);
 
-    return data.sort((a, b) => b.count - a.count);
+  return [
+    ...top5.map(([name, count]) => ({ name, count })),
+    { name: "Others", count: othersCount }, // always LAST
+  ];
+} else {
+  return sortedEntries.map(([name, count]) => ({
+    name,
+    count,
+  }));
+}
   }, [plans]);
 
   const avgCoveredBenefitCount = useMemo(() => {
@@ -109,8 +111,8 @@ const Dashboard: React.FC = () => {
         return "#F59E0B";
       case "Silver":
         return "#94A3B8";
-      case "Bronze":
-        return "#B45309";
+      case "Expanded Bronze":
+        return "#843f0a";
       case "Others":
         return "#CBD5E1";
       default:
@@ -123,10 +125,10 @@ const Dashboard: React.FC = () => {
       <header className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight underline decoration-blue-500 decoration-4 underline-offset-8">
-            Dataset Technical Analysis
+            Insurance Plans Overview
           </h1>
           <p className="text-slate-500 font-medium mt-4">
-            Quantitative summary derived from Plans records
+            Snapshot of key insights from all available plans
           </p>
         </div>
         <div className="hidden md:block px-4 py-2 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 text-xs font-black uppercase tracking-widest">
@@ -142,7 +144,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Total Plans Covered
+            Total Available Plans
           </p>
           <p className="text-3xl font-black text-slate-900">{totalRecords}</p>
         </div>
@@ -154,7 +156,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            IsNewPlan: 'New' Count
+            Newly Added Plans
           </p>
           <p className="text-3xl font-black text-slate-900">{newPlansCount}</p>
         </div>
@@ -166,7 +168,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Avg CoveredBenefitCount
+            Avgerage Benefits / Plan
           </p>
           <p className="text-3xl font-black text-slate-900">
             {avgCoveredBenefitCount}
@@ -180,7 +182,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Unique StateCode Count
+            State Covered
           </p>
           <p className="text-3xl font-black text-slate-900">
             {stateCodeData.length}
@@ -192,7 +194,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center space-x-2">
             <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
-            <span>StateCode Distribution Analysis</span>
+            <span>Plans by State</span>
           </h3>
           <div className="w-full h-[320px] relative">
             {isMounted && (
@@ -240,7 +242,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center space-x-2">
             <span className="w-1.5 h-4 bg-emerald-600 rounded-full"></span>
-            <span>MetalLevel Frequency Mapping</span>
+            <span>Plan Types Distribution</span>
           </h3>
           <div className="w-full h-[320px] relative">
             {isMounted && (
