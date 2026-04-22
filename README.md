@@ -31,7 +31,7 @@ Just tell the AI your needs (state, budget, medical needs) and get the best plan
    ```bash
    npm run dev
    ```
-   Visit: health-insurance-plan.vercel.app
+   Visit: https://health-insurance-plan.vercel.app
 
 ## 🚀 Deploy
 1. Push to GitHub
