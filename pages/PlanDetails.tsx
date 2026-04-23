@@ -178,19 +178,19 @@ const PlanDetails: React.FC = () => {
           <Section title="Coverage & Cost Mapping" icon={Layers}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
               <DetailItem
-                label="TEHB Individual Deductible"
+                label="Individual Deductible"
                 value={plan.TEHBDedInnTier1Individual}
               />
               <DetailItem
-                label="TEHB Family (Per Person)"
+                label="Family Deductible (Per Person)"
                 value={plan.TEHBDedInnTier1FamilyPerPerson}
               />
               <DetailItem
-                label="TEHB Family (Per Group)"
+                label="Family Deductible (Per Group)"
                 value={plan.TEHBDedInnTier1FamilyPerGroup}
               />
               <DetailItem
-                label="TEHB Tier 1 Coinsurance"
+                label="Coinsurance"
                 value={plan.TEHBDedInnTier1Coinsurance}
               />
               <DetailItem
@@ -219,22 +219,22 @@ const PlanDetails: React.FC = () => {
                 value={plan.StandardComponentId}
               />
               <DetailItem
-                label="Registry Business Year"
+                label="Plan Year"
                 value={plan.BusinessYear}
               />
               <DetailItem
                 label="Market Coverage Tier"
                 value={plan.MarketCoverage}
               />
-              <DetailItem label="IsNewPlan Record" value={plan.IsNewPlan} />
+              <DetailItem label="Plan Status" value={plan.IsNewPlan} />
               <DetailItem label="System Import Date" value={plan.ImportDate} />
               <DetailItem
-                label="Technical Source Name"
+                label="Source Name"
                 value={plan.SourceName}
               />
-              <DetailItem label="Network Identifier" value={plan.NetworkId} />
+              <DetailItem label="Network ID" value={plan.NetworkId} />
               <DetailItem
-                label="Service Area Identifier"
+                label="Service Area"
                 value={plan.ServiceAreaId}
               />
             </div>
@@ -267,7 +267,7 @@ const PlanDetails: React.FC = () => {
         </div>
 
         <div className="lg:col-span-4 flex flex-col">
-          <Section title="Benefit Summary (SBC)" icon={FileCheck}>
+          <Section title="Benefit Highlights" icon={FileCheck}>
             <div className="space-y-4">
               <div className="p-4 bg-slate-50/50 border border-slate-100 rounded-xl shadow-sm">
                 <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-[0.1em] mb-3">

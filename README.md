@@ -20,7 +20,7 @@ Just tell the AI your needs (state, budget, medical needs) and get the best plan
    cd insureplan-explorer
    npm install
    ```
-2. Add your API keys to `.env.local` (never share these!):
+2. Add your API keys to `.env.local`:
    ```env
    GEMINI_API_KEY=your_gemini_api_key
    VITE_SUPABASE_URL=your_supabase_url

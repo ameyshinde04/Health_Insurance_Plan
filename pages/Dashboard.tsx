@@ -168,7 +168,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-            Avgerage Benefits / Plan
+            Average Benefits per Plan
           </p>
           <p className="text-3xl font-black text-slate-900">
             {avgCoveredBenefitCount}
@@ -242,7 +242,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center space-x-2">
             <span className="w-1.5 h-4 bg-emerald-600 rounded-full"></span>
-            <span>Plan Types Distribution</span>
+            <span>Metal Level Distribution</span>
           </h3>
           <div className="w-full h-[320px] relative">
             {isMounted && (

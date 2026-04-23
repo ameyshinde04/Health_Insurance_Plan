@@ -524,13 +524,13 @@ const Browse: React.FC = () => {
               <div className="p-6 pt-2 space-y-8">
                 <div>
                   <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
-                    SEARCH REGISTRY
+                    SEARCH BY
                   </label>
                   <div className="relative group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                     <input
                       type="text"
-                      placeholder="Plan Name or ID..."
+                      placeholder="Plan Name / ID"
                       className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-[16px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium placeholder:text-[#CBD5E1]"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -541,7 +541,7 @@ const Browse: React.FC = () => {
                 {/* StateCode Filter UI (Dropdown) */}
                 <div>
                   <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
-                    STATECODE FILTER
+                    STATECODE 
                   </label>
                   <div className="relative" ref={stateDropdownRef}>
                     <button
@@ -691,7 +691,7 @@ const Browse: React.FC = () => {
                 {/* PlanType Specification (Selection Button Grid) */}
                 <div>
                   <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
-                    PLANTYPE SPECIFICATION
+                    PLANTYPE 
                   </label>
                   <div className="grid grid-cols-2 gap-2.5">
                     {["All", ...availableTypes].map((t) => (
@@ -715,7 +715,7 @@ const Browse: React.FC = () => {
 
                 <div>
                   <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
-                    ISNEWPLAN STATUS
+                    PLAN STATUS
                   </label>
                   <div className="space-y-3">
                     {["All", "Existing", "New"].map((v) => (
@@ -733,7 +733,7 @@ const Browse: React.FC = () => {
                           />
                         </div>
                         <span className="ml-3 text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors tracking-tight">
-                          {v} Registry
+                          {v} Plans
                         </span>
                       </label>
                     ))}
@@ -808,7 +808,7 @@ const Browse: React.FC = () => {
                   <div className="pt-4 border-t border-slate-200 flex items-center justify-between mt-auto">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">
-                        TEHB Deductible
+                        Individual Deductible
                       </p>
                       <p className="font-black text-blue-600">
                         {plan.TEHBDedInnTier1Individual || "N/A"}
@@ -843,7 +843,7 @@ const Browse: React.FC = () => {
                       PlanType
                     </th>
                     <th className="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                      TEHB Deductible
+                      Individual Deductible
                     </th>
                     <th className="px-8 py-6"></th>
                   </tr>
