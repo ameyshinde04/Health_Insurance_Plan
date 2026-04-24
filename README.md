@@ -16,8 +16,8 @@ Just tell the AI your needs (state, budget, medical needs) and get the best plan
 ## ⚡ Quick Start
 1. Clone & install:
    ```bash
-   git clone https://github.com/your-username/insureplan-explorer.git
-   cd insureplan-explorer
+   git clone https://github.com/ameyshinde04/Health_Insurance_Plan.git
+   cd Health_Insurance_Plan
    npm install
    ```
 2. Add your API keys to `.env.local`:
